@@ -28,8 +28,8 @@ Wecty: フロントエンドフレームワーク for Go and TinyGo
 - Event: タグのイベントをマークアップ
 - Router: シンプルな SPA ルーター(URL のハッシュ利用)
 - Utilities:
-  - html2wecty: go-generate 用ツール、HTML 記述から Go のコードを生成
-  - devserver: 開発用サーバー
+  - wecty generate: go-generate 用ツール、HTML 記述から Go のコードを生成
+  - wecty server: 開発用サーバー
 
 ## 基本の使い方
 
@@ -99,7 +99,7 @@ func (c *TopView) OnSubmit(ev js.Value) interface{} {
 }
 ```
 
-また以下の記述を top.go に加えておくと go generate で html2wecty が自動的に走るようになります。
+また以下の記述を top.go に加えておくと go generate で wecty generate が自動的に走るようになります。
 
 ```go
 //go:generate wecty generate -c TopView -p main top.html
@@ -140,13 +140,13 @@ top_gen.go が生成され WASM がビルド＆サーブされブラウザで動
 
   A: URL を書き換えるスタイルはプロキシサーバーの URL 割り当てと整合をとる必要がある。ハッシュベースは単一の URL を振り向けるだけで動作する。つまり、SPA コンテンツを S3 に置いた場合でも動作する。
 
-- Q: Vecty のように props や event パッケージを設けないのはなぜ？
+- Q: Vecty のように prop や event パッケージを設けないのはなぜ？
 
-  A: 基本のマークアップは html2wecty の出力に任せるのでマークアップの容易さは無用だった。それにそれらのパッケージが WASM サイズの肥大化を招いていた。
+  A: 基本のマークアップは wecty generate の出力に任せるのでマークアップの容易さは無用だった。それにそれらのパッケージが WASM サイズの肥大化を招いていた。
 
-- Q: html2wecty はマークアップ機能が足りないのはなぜ？
+- Q: wecty generate のマークアップ機能が足りないのはなぜ？
 
-  A: 頑張っても Go の手書きの自由度を超えることはできない。ユーザーは html2wecty で済ますか Go のコードで細かく書いてコンポーネントを実装するかを使い分けてもらいたい。
+  A: 頑張っても Go の手書きの自由度を超えることはできない。ユーザーは wecty generate で済ますか Go のコードで細かく書いてコンポーネントを実装するかを使い分けてもらいたい。
 
 - Q: コンポーネントより細かい単位の最適な DOM ツリーの更新をしないのはなぜ？
 

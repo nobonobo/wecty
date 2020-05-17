@@ -1,6 +1,6 @@
 # Wecty
 
-Wecty: フロントエンドフレームワーク for Go and TinyGo
+Wecty: フロントエンドツールキット for Go and TinyGo
 
 - Wecty は [Vecty(github.com/gopherjs/vecty)](https://github.com/gopherjs/vecty) のアイディアを元にしています
 - Wecty は Vecty よりも単純に実装されました
@@ -206,7 +206,7 @@ Usage of generate:
 - default `package name`=`main`
 - require `component name`
 
-### 基本
+### HTML ライクなマークアップの基本
 
 `<body></body>` -> `wecty.Tag("body")`
 
@@ -311,4 +311,4 @@ Todo サンプルのコンパイル事例
 - 条件別マークアップ機能の提供
 - デプロイ用の静的ファイルセットをエクスポートする支援機能の提供
 - 新規プロジェクト生成機能の提供
-- コマンドツールの統合＆サブコマンドによる多機能化
+- ~~コマンドツールの統合＆サブコマンドによる多機能化~~

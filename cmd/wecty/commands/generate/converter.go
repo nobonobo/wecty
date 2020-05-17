@@ -214,6 +214,7 @@ func (c *Converter) generate(w io.Writer, r io.Reader) (err error) {
 			indent--
 			switch c.State {
 			case "import", "raw":
+				c.State = ""
 				continue
 			}
 			tab := strings.Repeat("\t", indent)

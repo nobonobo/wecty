@@ -383,6 +383,7 @@ func RenderBody(c Component) {
 	if strings.ToLower(body.Get("tagName").String()) != "body" {
 		panic("top level element must be 'body'")
 	}
+	c.ref().last = body
 	replaceNode(body, target)
 	finalize()
 }

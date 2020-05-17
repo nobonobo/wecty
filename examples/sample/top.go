@@ -14,7 +14,8 @@ type Top struct {
 	text string
 }
 
-func (c *Top) OnClick(ev js.Value) interface{} {
+func (c *Top) OnSubmit(ev js.Value) interface{} {
+	ev.Call("preventDefault")
 	c.text = time.Now().Format(time.RFC3339Nano)
 	wecty.Rerender(c)
 	return nil

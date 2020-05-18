@@ -114,7 +114,6 @@ func (e eventMarkup) apply(node js.Wrapper) {
 
 // Core ...
 type Core struct {
-	parent    Component
 	last      js.Value
 	isNode    bool
 	children  []Component
@@ -144,6 +143,7 @@ func (c *Core) cleanup() {
 			}
 		}
 		child.ref().cleanup()
+		deleteNode = append(deleteNode, child.ref().last)
 	}
 	if len(c.listeners) > 0 {
 		for _, l := range c.listeners {
@@ -253,7 +253,6 @@ func (n *Node) html() js.Value {
 				}
 				c.ref().last = jv
 				core.last.Call("appendChild", jv)
-				c.ref().parent = n
 			}
 		}
 		core.update = true
@@ -273,6 +272,7 @@ func replaceNode(newNode, oldNode js.Value) {
 func finalize() {
 	for _, v := range deleteNode {
 		if parent := v.Get("parentNode"); !parent.IsNull() {
+			console.Call("log", v)
 			parent.Call("removeChild", v)
 		}
 	}
@@ -330,8 +330,8 @@ func Rerender(c Component) {
 	if u, ok := c.(Unmounter); ok && !c.ref().last.IsUndefined() {
 		u.Unmount()
 	}
-	c.ref().cleanup()
 	act := document.Get("activeElement").Get("id").String()
+	c.ref().cleanup()
 	target := c.ref().last
 	newNode := Render(c).html()
 	replaceNode(newNode, target)

@@ -10,6 +10,7 @@ func (c *Top) Render() wecty.HTML {
 		wecty.Tag("form", 			
 			wecty.Event("submit", c.OnSubmit),
 			wecty.Tag("input", 				
+				wecty.Attr("id", "name"),
 				wecty.Attr("type", "text"),
 			),
 		),

@@ -357,6 +357,7 @@ func Rerender(c Component) {
 	if u, ok := c.ref().current.(Unmounter); ok {
 		u.Unmount()
 	}
+	act := document.Get("activeElement").Get("id").String()
 	target := renderDOMNode(c)
 	html := Render(c)
 	newNode := html.html()
@@ -365,6 +366,9 @@ func Rerender(c Component) {
 		n.ref().last = newNode
 	}
 	replaceNode(newNode, target)
+	if f := document.Call("getElementById", act); !f.IsNull() {
+		f.Call("focus")
+	}
 	finalize()
 }
 

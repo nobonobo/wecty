@@ -1,6 +1,7 @@
 package wecty
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"syscall/js"
@@ -87,17 +88,6 @@ func (c Class) apply(node js.Wrapper) {
 	}
 }
 
-type eventReleaser struct {
-	node  js.Value
-	event string
-	cb    js.Func
-}
-
-func (er *eventReleaser) Release() {
-	er.node.Call("removeEventListener", er.event, er.cb)
-	er.cb.Release()
-}
-
 // eventMarkup ...
 type eventMarkup struct {
 	name string
@@ -114,27 +104,23 @@ func (e eventMarkup) apply(node js.Wrapper) {
 	cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		return e.fn(args[0])
 	})
-	core.listeners = append(core.listeners, cb)
-	/*
-		core.listeners = append(core.listeners, &eventReleaser{
-			node:  node.JSValue(),
-			event: e.name,
-			cb:    cb,
-		})
-	*/
-	node.JSValue().Call("addEventListener", e.name, cb, false)
+	jv := node.JSValue()
+	core.listeners = append(core.listeners, func() {
+		jv.Call("removeEventListener", e.name, cb, false)
+		cb.Release()
+	})
+	jv.Call("addEventListener", e.name, cb, false)
 }
 
 // Core ...
 type Core struct {
-	current   Component
 	parent    Component
 	last      js.Value
 	isNode    bool
 	children  []Component
-	listeners []js.Func
-	//listeners []*eventReleaser
-	update bool
+	mount     []bool
+	listeners []func()
+	update    bool
 }
 
 // JSValue ...
@@ -150,21 +136,27 @@ func (c *Core) html() js.Value {
 }
 
 func (c *Core) cleanup() {
-	for _, child := range c.children {
-		child.ref().cleanup()
-		if last := child.ref().last; !last.IsNull() {
-			deleteNode = append(deleteNode, last)
+	for i, child := range c.children {
+		if len(c.mount) > 0 {
+			if u, ok := child.(Unmounter); ok && c.mount[i] {
+				u.Unmount()
+				c.mount[i] = false
+			}
 		}
+		child.ref().cleanup()
 	}
-	for _, l := range c.listeners {
-		l.Release()
+	if len(c.listeners) > 0 {
+		for _, l := range c.listeners {
+			l()
+		}
+		c.listeners = nil
 	}
-	c.listeners = nil
 }
 
 // appendChild ...
 func (c *Core) appendChild(child Component) {
 	c.children = append(c.children, child)
+	c.mount = append(c.mount, false)
 	c.update = false
 }
 
@@ -177,17 +169,6 @@ type textNode struct {
 // markup ...
 func (t *textNode) markup() Applyer { return nil }
 
-// Render ...
-func (t *textNode) Render() HTML {
-	return nil
-}
-
-// JSValue ...
-func (t *textNode) JSValue() js.Value {
-	return t.ref().last
-}
-
-// html ...
 func (t *textNode) html() js.Value {
 	core := t.Core.ref()
 	if !core.update {
@@ -195,6 +176,20 @@ func (t *textNode) html() js.Value {
 		core.update = true
 	}
 	return core.last
+}
+
+// Render ...
+func (t *textNode) Render() HTML {
+	return t
+}
+
+// JSValue ...
+func (t *textNode) JSValue() js.Value {
+	return t.ref().last
+}
+
+func (t *textNode) String() string {
+	return fmt.Sprintf("%q(%p)", t.text, t)
 }
 
 // Node element
@@ -206,12 +201,17 @@ type Node struct {
 
 func (n *Node) markup() Applyer { return nil }
 
+func (n *Node) String() string {
+	return fmt.Sprintf("<%s(%p)>", n.tag, n)
+}
+
 // Render ...
 func (n *Node) Render() HTML {
 	core := n.ref()
+	core.children = nil
+	core.mount = nil
 	for _, a := range n.markups {
 		if v, ok := a.(Component); ok {
-			v.Render()
 			core.appendChild(v)
 		}
 	}
@@ -227,7 +227,6 @@ func (n *Node) JSValue() js.Value {
 func (n *Node) html() js.Value {
 	core := n.ref()
 	if !core.update {
-		core.current = n
 		core.last = document.Call("createElement", n.tag)
 		for _, a := range n.markups {
 			m := a.markup()
@@ -235,10 +234,21 @@ func (n *Node) html() js.Value {
 				m.apply(n)
 			}
 		}
-		for _, c := range n.ref().children {
-			jv := renderDOMNode(c)
-			if !jv.IsUndefined() {
-				if m, ok := c.ref().current.(Mounter); ok {
+		for i, c := range n.ref().children {
+			if m, ok := c.(Unmounter); ok && n.ref().mount[i] {
+				m.Unmount()
+				n.ref().mount[i] = false
+			}
+			html := c.Render()
+			if !c.ref().isNode {
+				node := html.(*Node)
+				node.Render()
+				c.ref().children = []Component{node}
+			}
+			jv := html.html()
+			if !jv.IsUndefined() && !jv.IsNull() {
+				if m, ok := c.(Mounter); ok {
+					n.ref().mount[i] = true
 					mountList = append(mountList, m)
 				}
 				c.ref().last = jv
@@ -260,49 +270,7 @@ func replaceNode(newNode, oldNode js.Value) {
 	oldNode.Get("parentNode").Call("replaceChild", newNode, oldNode)
 }
 
-// renderDOMNode ...
-func renderDOMNode(c Component) js.Value {
-	if !c.ref().last.IsUndefined() {
-		return c.ref().last
-	}
-	c.ref().current = c
-	html := c.Render()
-	if !c.ref().isNode && html != nil {
-		node := html.(*Node)
-		c.ref().children = []Component{node}
-		if !node.ref().last.IsUndefined() {
-			return node.ref().last
-		}
-		d := node.JSValue()
-		if d.IsUndefined() {
-			node.Render()
-			return node.html()
-		}
-		return d
-	}
-	if html != nil {
-		return html.html()
-	}
-	if r, ok := c.(HTML); ok {
-		return r.html()
-	}
-	panic("invalid component")
-}
-
-func requestAnimationFrame(callback func(float64)) int {
-	var cb js.Func
-	cb = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		cb.Release()
-		if callback != nil {
-			callback(args[0].Float())
-		}
-		return js.Undefined()
-	})
-	return global.Call("requestAnimationFrame", cb).Int()
-}
-
 func finalize() {
-	//requestAnimationFrame(nil)
 	for _, v := range deleteNode {
 		if parent := v.Get("parentNode"); !parent.IsNull() {
 			parent.Call("removeChild", v)
@@ -323,9 +291,11 @@ func Attr(key string, value interface{}) Markup {
 
 // Text Node
 func Text(s string) Markup {
-	return &textNode{
+	t := &textNode{
 		text: s,
 	}
+	t.Core.isNode = true
+	return t
 }
 
 // Tag Node
@@ -339,6 +309,10 @@ func Render(c Component) HTML {
 		mountList = append(mountList, m)
 	}
 	html := c.Render()
+	if !c.ref().isNode {
+		node := html.(*Node)
+		c.ref().children = []Component{node}
+	}
 	for !c.ref().isNode {
 		r, ok := html.(Component)
 		if ok {
@@ -353,30 +327,24 @@ func Render(c Component) HTML {
 
 // Rerender ...
 func Rerender(c Component) {
-	c.ref().cleanup()
-	if u, ok := c.ref().current.(Unmounter); ok {
+	if u, ok := c.(Unmounter); ok && !c.ref().last.IsUndefined() {
 		u.Unmount()
 	}
+	c.ref().cleanup()
 	act := document.Get("activeElement").Get("id").String()
-	target := renderDOMNode(c)
-	html := Render(c)
-	newNode := html.html()
-	c.ref().last = newNode
-	if n, ok := c.ref().children[0].(*Node); ok {
-		n.ref().last = newNode
-	}
+	target := c.ref().last
+	newNode := Render(c).html()
 	replaceNode(newNode, target)
 	if f := document.Call("getElementById", act); !f.IsNull() {
 		f.Call("focus")
 	}
+	c.ref().last = newNode
 	finalize()
+	//PrintTree(c, 0)
 }
 
 // RenderBody ...
 func RenderBody(c Component) {
-	if u, ok := c.ref().current.(Unmounter); ok {
-		u.Unmount()
-	}
 	target := document.Call("querySelector", "body")
 	html := Render(c)
 	if !c.ref().isNode && html != nil {
@@ -387,9 +355,10 @@ func RenderBody(c Component) {
 	if strings.ToLower(body.Get("tagName").String()) != "body" {
 		panic("top level element must be 'body'")
 	}
-	c.ref().last = body
 	replaceNode(body, target)
+	c.ref().last = body
 	finalize()
+	//PrintTree(c, 0)
 }
 
 // Event ...
@@ -425,9 +394,22 @@ func AddScript(url string) {
 	document.Get("head").Call("appendChild", script)
 }
 
+// RequestAnimationFrame ...
+func RequestAnimationFrame(callback func(float64)) int {
+	var cb js.Func
+	cb = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		cb.Release()
+		if callback != nil {
+			callback(args[0].Float())
+		}
+		return js.Undefined()
+	})
+	return global.Call("requestAnimationFrame", cb).Int()
+}
+
 // PrintTree ...
 func PrintTree(c Component, indent int) {
-	log.Printf("%s%[2]T(%[2]p)", strings.Repeat("  ", indent), c)
+	log.Printf("%s%v", strings.Repeat("  ", indent), c)
 	log.Printf("%s%[2]T(%#[2]v)", strings.Repeat("  ", indent), c.ref().last)
 	for _, child := range c.ref().children {
 		PrintTree(child, indent+1)

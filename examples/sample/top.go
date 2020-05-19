@@ -2,20 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"runtime"
 	"syscall/js"
 	"time"
 
 	"github.com/nobonobo/wecty"
 )
-
-func NewSub() *Sub {
-	s := new(Sub)
-	log.Printf("new sub: %p", s)
-	runtime.SetFinalizer(s, func(*Sub) { log.Printf("fin Sub: %p", s) })
-	return s
-}
 
 type Sub struct {
 	wecty.Core
@@ -58,11 +49,4 @@ func (c *Top) Mount() {
 
 func (c *Top) Unmount() {
 	//log.Print("top unmount")
-}
-
-func (c *Top) Sub() *Sub {
-	if c.sub == nil {
-		c.sub = &Sub{}
-	}
-	return c.sub
 }

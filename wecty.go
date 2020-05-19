@@ -197,6 +197,7 @@ func (t *textNode) String() string {
 // Node element
 type Node struct {
 	Core
+	ns      string
 	tag     string
 	markups []Markup
 }
@@ -229,7 +230,11 @@ func (n *Node) JSValue() js.Value {
 func (n *Node) html() js.Value {
 	core := n.ref()
 	if !core.update {
-		core.last = document.Call("createElement", n.tag)
+		if len(n.ns) > 0 {
+			core.last = document.Call("createElementNS", n.ns, n.tag)
+		} else {
+			core.last = document.Call("createElement", n.tag)
+		}
 		for _, a := range n.markups {
 			m := a.markup()
 			if m != nil {
@@ -303,6 +308,11 @@ func Text(s string) Markup {
 // Tag Node
 func Tag(name string, markups ...Markup) *Node {
 	return &Node{Core: Core{isNode: true}, tag: name, markups: markups}
+}
+
+// TagWithNS Node with NameSpace
+func TagWithNS(name, ns string, markups ...Markup) *Node {
+	return &Node{Core: Core{isNode: true}, tag: name, ns: ns, markups: markups}
 }
 
 // Render ...

@@ -18,6 +18,6 @@ func (c *Top) Render() wecty.HTML {
 		wecty.Tag("h2", 
 			wecty.Text(c.text),
 		),
-		c.Sub(),
+		&Sub{},
 	)
 }

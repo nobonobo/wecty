@@ -143,8 +143,10 @@ func (c *Core) cleanup() {
 			}
 		}
 		child.ref().cleanup()
-		deleteNode = append(deleteNode, child.ref().last)
+		//deleteNode = append(deleteNode, child.ref().last)
+		child.ref().last = js.Null()
 	}
+	c.children = nil
 	if len(c.listeners) > 0 {
 		for _, l := range c.listeners {
 			l()
@@ -330,14 +332,15 @@ func Rerender(c Component) {
 	if u, ok := c.(Unmounter); ok && !c.ref().last.IsUndefined() {
 		u.Unmount()
 	}
+	target := c.ref().last
 	act := document.Get("activeElement").Get("id").String()
 	c.ref().cleanup()
-	target := c.ref().last
 	newNode := Render(c).html()
 	replaceNode(newNode, target)
 	if f := document.Call("getElementById", act); !f.IsNull() {
 		f.Call("focus")
 	}
+	target.Call("remove")
 	c.ref().last = newNode
 	finalize()
 	//PrintTree(c, 0)

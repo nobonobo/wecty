@@ -2,17 +2,16 @@ package wecty
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"syscall/js"
 )
 
 var (
-	global     = js.Global()
-	document   = global.Get("document")
-	console    = global.Get("console")
-	mountList  []Mounter
-	deleteNode []js.Value
+	global              = js.Global()
+	document            = global.Get("document")
+	console             = global.Get("console")
+	mountList           []Mounter
+	listenerReleaseList []func()
 )
 
 // ==================
@@ -99,13 +98,11 @@ func (e eventMarkup) markup() Applyer {
 }
 
 func (e eventMarkup) apply(node js.Wrapper) {
-	n := node.(*Node)
-	core := n.ref()
 	cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		return e.fn(args[0])
 	})
 	jv := node.JSValue()
-	core.listeners = append(core.listeners, func() {
+	listenerReleaseList = append(listenerReleaseList, func() {
 		jv.Call("removeEventListener", e.name, cb, false)
 		cb.Release()
 	})
@@ -114,12 +111,11 @@ func (e eventMarkup) apply(node js.Wrapper) {
 
 // Core ...
 type Core struct {
-	last      js.Value
-	isNode    bool
-	children  []Component
-	mount     []bool
-	listeners []func()
-	update    bool
+	last     js.Value
+	isNode   bool
+	children []Component
+	mount    []bool
+	update   bool
 }
 
 // JSValue ...
@@ -132,27 +128,6 @@ func (c *Core) markup() Applyer { return nil }
 // html ...
 func (c *Core) html() js.Value {
 	return c.last
-}
-
-func (c *Core) cleanup() {
-	for i, child := range c.children {
-		if len(c.mount) > 0 {
-			if u, ok := child.(Unmounter); ok && c.mount[i] {
-				u.Unmount()
-				c.mount[i] = false
-			}
-		}
-		child.ref().cleanup()
-		//deleteNode = append(deleteNode, child.ref().last)
-		child.ref().last = js.Null()
-	}
-	c.children = nil
-	if len(c.listeners) > 0 {
-		for _, l := range c.listeners {
-			l()
-		}
-		c.listeners = nil
-	}
 }
 
 // appendChild ...
@@ -213,11 +188,15 @@ func (n *Node) Render() HTML {
 	core := n.ref()
 	core.children = nil
 	core.mount = nil
+	markups := []Markup{}
 	for _, a := range n.markups {
 		if v, ok := a.(Component); ok {
 			core.appendChild(v)
+		} else {
+			markups = append(markups, a)
 		}
 	}
+	n.markups = markups
 	return n
 }
 
@@ -276,13 +255,29 @@ func replaceNode(newNode, oldNode js.Value) {
 	oldNode.Get("parentNode").Call("replaceChild", newNode, oldNode)
 }
 
-func finalize() {
-	for _, v := range deleteNode {
-		if parent := v.Get("parentNode"); !parent.IsNull() {
-			console.Call("log", v)
-			parent.Call("removeChild", v)
+func cleanup(c Component) {
+	core := c.ref()
+	for i, child := range core.children {
+		if len(core.mount) > 0 {
+			if u, ok := child.(Unmounter); ok && core.mount[i] {
+				u.Unmount()
+				core.mount[i] = false
+			}
 		}
+		cleanup(child)
 	}
+	core.children = nil
+}
+
+func cleanupAll(c Component) {
+	cleanup(c)
+	for _, v := range listenerReleaseList {
+		go v()
+	}
+	listenerReleaseList = nil
+}
+
+func finalize() {
 	for _, v := range mountList {
 		v.Mount()
 	}
@@ -343,8 +338,8 @@ func Rerender(c Component) {
 		u.Unmount()
 	}
 	target := c.ref().last
+	cleanupAll(c)
 	act := document.Get("activeElement").Get("id").String()
-	c.ref().cleanup()
 	newNode := Render(c).html()
 	replaceNode(newNode, target)
 	if f := document.Call("getElementById", act); !f.IsNull() {
@@ -353,7 +348,6 @@ func Rerender(c Component) {
 	target.Call("remove")
 	c.ref().last = newNode
 	finalize()
-	//PrintTree(c, 0)
 }
 
 // RenderBody ...
@@ -371,7 +365,6 @@ func RenderBody(c Component) {
 	replaceNode(body, target)
 	c.ref().last = body
 	finalize()
-	//PrintTree(c, 0)
 }
 
 // Event ...
@@ -420,6 +413,7 @@ func RequestAnimationFrame(callback func(float64)) int {
 	return global.Call("requestAnimationFrame", cb).Int()
 }
 
+/*
 // PrintTree ...
 func PrintTree(c Component, indent int) {
 	log.Printf("%s%v", strings.Repeat("  ", indent), c)
@@ -428,3 +422,4 @@ func PrintTree(c Component, indent int) {
 		PrintTree(child, indent+1)
 	}
 }
+*/

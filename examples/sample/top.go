@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"syscall/js"
-	"time"
 
 	"github.com/nobonobo/wecty"
 )
@@ -17,11 +16,11 @@ func (c *Sub) String() string {
 }
 
 func (c *Sub) Mount() {
-	//log.Print("sub mount")
+	println("sub mount")
 }
 
 func (c *Sub) Unmount() {
-	//log.Print("sub unmount")
+	println("sub unmount")
 }
 
 func (c *Sub) Render() wecty.HTML {
@@ -32,13 +31,15 @@ func (c *Sub) Render() wecty.HTML {
 
 type Top struct {
 	wecty.Core
-	text string
-	sub  *Sub
+	text  string
+	sub   *Sub
+	count int
 }
 
 func (c *Top) OnSubmit(ev js.Value) interface{} {
 	ev.Call("preventDefault")
-	c.text = time.Now().Format(time.RFC3339Nano)
+	c.count++
+	c.text = fmt.Sprintf("hoge:%d", c.count) //time.Now().Format(time.RFC3339Nano)
 	wecty.Rerender(c)
 	return nil
 }

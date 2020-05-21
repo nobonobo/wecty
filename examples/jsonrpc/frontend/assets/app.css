@@ -1,0 +1,27 @@
+.navbar {
+  box-shadow: lightgrey 2px 2px 2px;
+  padding: 1rem;
+}
+
+.navbar-brand {
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.container {
+  padding: 1rem;
+}
+
+.container .column {
+  padding: 0.4rem;
+}
+
+#dump > #dump-fname {
+  display: none;
+}
+
+.disabled {
+  cursor: default;
+  opacity: 0.5;
+  pointer-events: none;
+}

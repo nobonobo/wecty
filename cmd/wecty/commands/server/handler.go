@@ -26,7 +26,7 @@ const indexHTML = `<!DOCTYPE html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <script src="wasm_exec.js"></script><script>
+    <script defer src="wasm_exec.js"></script><script>
       (async () => {
         const resp = await fetch('main.wasm');
         if (!resp.ok) {

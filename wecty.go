@@ -338,6 +338,9 @@ func Rerender(c Component) {
 		u.Unmount()
 	}
 	target := c.ref().last
+	if target.IsNull() || target.IsUndefined() {
+		panic("rerender not renderd node")
+	}
 	cleanupAll(c)
 	act := document.Get("activeElement").Get("id").String()
 	newNode := Render(c).html()
@@ -398,6 +401,32 @@ func AddScript(url string) {
 	script := document.Call("createElement", "script")
 	script.Set("src", url)
 	document.Get("head").Call("appendChild", script)
+}
+
+// AddModule adds an external script to the document.
+func AddModule(url string, words ...string) {
+	ch := make(chan bool)
+	script := document.Call("createElement", "script")
+	script.Set("type", "module")
+	global.Set("__callback__", Callback1(func(ev js.Value) interface{} {
+		close(ch)
+		println("loaded")
+		return nil
+	}))
+	keys := "*"
+	if len(words) > 0 {
+		keys = fmt.Sprintf("{ %s }", strings.Join(words, " "))
+	}
+	lines := []string{}
+	for _, v := range words {
+		lines = append(lines, fmt.Sprintf("window.%[1]s = %[1]s", v))
+	}
+	lines = append(lines, "__callback__(null)")
+	imp := strings.Join(lines, ";\n")
+	t := document.Call("createTextNode", fmt.Sprintf("import %s from %q;\n%s", keys, url, imp))
+	script.Call("appendChild", t)
+	document.Get("head").Call("appendChild", script)
+	<-ch
 }
 
 // RequestAnimationFrame ...

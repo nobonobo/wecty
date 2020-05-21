@@ -111,3 +111,8 @@ func (c *defaultNotFoundPage) Render() HTML {
 func NotFoundPage() Component {
 	return &defaultNotFoundPage{key: GetURL().String()}
 }
+
+// Navigate ...
+func Navigate(s string) {
+	global.Get("location").Set("href", "#"+s)
+}

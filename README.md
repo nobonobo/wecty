@@ -276,6 +276,8 @@ import (
 Usage of server:
   -addr string
     	listen address (default ":8080")
+  -p path=endpoint
+      add reverse proxy rule (allow multiple rules)
   -tinygo
     	use tinygo tool chain
 ```
@@ -286,10 +288,24 @@ Usage of server:
 - "main.wasm"を要求されるとその該当フォルダで go-generate と WASM のビルド、gzip が行われその結果をサーブします
 - index.html が無いところで要求されたら標準的な WASM 読み込み用 HTML を返します
 - "wasm_exec.js"リソースが要求されたら適切な wasm_exec.js をサーブします
+- 指定パスへのアクセス要求を別の Web サーバーへ転送します（リバースプロキシー）
 
 ### コマンドオプション
 
--tinygo: WASM ビルドに tinygo を使う
+- -addr: 開発サーバーのリッスンアドレスの指定
+- -p: 転送ルールの追加（複数指定可能）
+- -tinygo: WASM ビルドに tinygo を使う
+
+例：
+
+```shell
+wecty server -addr :8080 -p /api/=http://localhost:9001
+```
+
+バックエンドサーバーを http://localhost:9001 にて動作させた状態で開発を進める場合などで使います。
+
+- http://localhost:8080/api/ へのアクセスは http://localhost:9001/ へ転送されます。
+- http://localhost:8080/api/hoge へのアクセスは http://localhost:9001/hoge へ転送されます。
 
 ## 出力サイズ
 

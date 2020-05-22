@@ -39,7 +39,25 @@
 - SetTitle(title string)
 - AddMeta(name, content string)
 - AddStylesheet(url string)
-- AddScript(url string)
+- LoadScript(url string)
+- LoadModule(names []string, url string) <-chan js.Value
+
+##### LoadModule 例
+
+```go
+names := []string{"Server", "Client"}
+defs := map[string]js.Value{}
+for obj := range wecty.LoadModule(names, "jsonrpclib.js") {
+  defs[names[0]] = obj
+  names = names[1:]
+}
+```
+
+以下の Javascript(module) 記述と等価
+
+```javascript
+import { Server , Client } as defs from "jsonrpclib.js";
+```
 
 ### ルーター
 

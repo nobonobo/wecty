@@ -396,37 +396,47 @@ func AddStylesheet(url string) {
 	document.Get("head").Call("appendChild", link)
 }
 
-// AddScript adds an external script to the document.
-func AddScript(url string) {
-	script := document.Call("createElement", "script")
-	script.Set("src", url)
-	document.Get("head").Call("appendChild", script)
-}
-
-// AddModule adds an external script to the document.
-func AddModule(url string, words ...string) {
+// LoadScript ...
+func LoadScript(url string) {
 	ch := make(chan bool)
-	script := document.Call("createElement", "script")
-	script.Set("type", "module")
-	global.Set("__callback__", Callback1(func(ev js.Value) interface{} {
-		close(ch)
-		println("loaded")
-		return nil
-	}))
-	keys := "*"
-	if len(words) > 0 {
-		keys = fmt.Sprintf("{ %s }", strings.Join(words, " "))
-	}
-	lines := []string{}
-	for _, v := range words {
-		lines = append(lines, fmt.Sprintf("window.%[1]s = %[1]s", v))
-	}
-	lines = append(lines, "__callback__(null)")
-	imp := strings.Join(lines, ";\n")
-	t := document.Call("createTextNode", fmt.Sprintf("import %s from %q;\n%s", keys, url, imp))
-	script.Call("appendChild", t)
+	script := Tag("script",
+		Attr("src", url),
+		Event("load", func(js.Value) interface{} {
+			println("load!")
+			close(ch)
+			return nil
+		}),
+	).Render().html()
 	document.Get("head").Call("appendChild", script)
 	<-ch
+}
+
+// LoadModule ...
+func LoadModule(names []string, url string) <-chan js.Value {
+	ch := make(chan js.Value)
+	js.Global().Set("__wecty_send__", Callback1(func(obj js.Value) interface{} {
+		ch <- obj
+		return nil
+	}))
+	js.Global().Set("__wecty_close__", Callback0(func() interface{} {
+		close(ch)
+		return nil
+	}))
+	lines := []string{}
+	for _, name := range names {
+		lines = append(lines, fmt.Sprintf("__wecty_send__(%s);", name))
+	}
+	lines = append(lines, "__wecty_close__();")
+	script := Tag("script",
+		Attr("type", "module"),
+		Text(fmt.Sprintf("import { %s } from %q;\n%s",
+			strings.Join(names, ", "),
+			url,
+			strings.Join(lines, "\n"),
+		)),
+	).Render().html()
+	document.Get("head").Call("appendChild", script)
+	return ch
 }
 
 // RequestAnimationFrame ...

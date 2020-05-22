@@ -106,7 +106,7 @@ func (dh *DevHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, fpath)
 		return
 	} else {
-		log.Println(err)
+		log.Println(err, base)
 	}
 	switch base {
 	case "index.html":

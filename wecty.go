@@ -98,24 +98,27 @@ func (e eventMarkup) markup() Applyer {
 }
 
 func (e eventMarkup) apply(node js.Wrapper) {
-	cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-		return e.fn(args[0])
-	})
-	jv := node.JSValue()
-	listenerReleaseList = append(listenerReleaseList, func() {
-		jv.Call("removeEventListener", e.name, cb, false)
-		cb.Release()
-	})
-	jv.Call("addEventListener", e.name, cb, false)
+	if n, ok := node.(*Node); ok {
+		cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			return e.fn(args[0])
+		})
+		jv := node.JSValue()
+		n.ref().listeners = append(n.ref().listeners, func() {
+			jv.Call("removeEventListener", e.name, cb, false)
+			cb.Release()
+		})
+		jv.Call("addEventListener", e.name, cb, false)
+	}
 }
 
 // Core ...
 type Core struct {
-	last     js.Value
-	isNode   bool
-	children []Component
-	mount    []bool
-	update   bool
+	last      js.Value
+	isNode    bool
+	children  []Component
+	mount     []bool
+	listeners []func()
+	update    bool
 }
 
 // JSValue ...
@@ -267,14 +270,9 @@ func cleanup(c Component) {
 		cleanup(child)
 	}
 	core.children = nil
-}
-
-func cleanupAll(c Component) {
-	cleanup(c)
-	for _, v := range listenerReleaseList {
-		go v()
+	for _, v := range core.listeners {
+		v()
 	}
-	listenerReleaseList = nil
 }
 
 func finalize() {
@@ -341,7 +339,7 @@ func Rerender(c Component) {
 	if target.IsNull() || target.IsUndefined() {
 		panic("rerender not renderd node")
 	}
-	cleanupAll(c)
+	cleanup(c)
 	act := document.Get("activeElement").Get("id").String()
 	newNode := Render(c).html()
 	replaceNode(newNode, target)

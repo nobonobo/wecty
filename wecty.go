@@ -87,6 +87,28 @@ func (c Class) apply(node js.Wrapper) {
 	}
 }
 
+type noApply struct{}
+
+func (n noApply) apply(node js.Wrapper) {}
+
+// ifMarkup ...
+type ifMarkup struct {
+	Cond   bool
+	Markup Markup
+}
+
+func (s ifMarkup) markup() Applyer {
+	if s.Cond {
+		return s.Markup.markup()
+	}
+	return noApply{}
+}
+
+// If ...
+func If(cond bool, m Markup) Markup {
+	return ifMarkup{Cond: cond, Markup: m}
+}
+
 // eventMarkup ...
 type eventMarkup struct {
 	name string
